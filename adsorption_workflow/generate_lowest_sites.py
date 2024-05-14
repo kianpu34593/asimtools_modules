@@ -7,7 +7,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.analysis.adsorption import plot_slab as plot_slab_pymatgen
 from asimtools.utils import get_atoms
 
-def generate_sites(
+def generate_lowest_sites(
     slab_image,
     adsorbate_lst: list,  # one adsorbate e.g. Li
     save_to_db = True,
