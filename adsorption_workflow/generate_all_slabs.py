@@ -23,14 +23,11 @@ from scipy.spatial.distance import squareform
 from scipy.cluster.hierarchy import fcluster, linkage
 
 
-def generate_slab(
+def generate_all_slabs(
     bulk_image,
     # mp_id: Union[int,str]=None,
     # api_key: str=None,
     slabgen_args: dict,  # { "miller_index", "min_slab_size", "min_vacuum_size", "center_slab", "in_unit_planes"}
-    slab_layer_lst: list,
-    shift_id: int,
-    order_id: int,
     symmetrize: bool,
     num_fix_layer: int = 2,
     visualize: bool = True,
@@ -166,79 +163,72 @@ def generate_slab(
         fig.savefig(f"{fig_name}.png")
 
     bulk_struct = get_atoms(**bulk_image)
-    slab_layer_df_lst = []
-    for slab_layer in slab_layer_lst:
-        slabgen_args["min_slab_size"] = slab_layer
-        slabgen = SlabGenerator(
-            initial_structure=bulk_struct, **slabgen_args
-        )  # bulk_pymatgen, miller_index, layer, vacuum_layer, center_slab, in_unit_planes,
-        slabs_symmetric = slabgen.get_slabs(symmetrize=symmetrize)
-        (
-            shift_ls,
-            order_ls,
-            slab_ase_ls,
-            num_different_layers_ls,
-            num_atom_ls,
-            composition_ls,
-        ) = ([], [], [], [], [], [])
-        for i, slab in enumerate(slabs_symmetric):
-            temp_path = Path("temp.cif")
-            CifWriter(slab).write_file(temp_path)
-            slab_ase = read(temp_path)
-            L = slab_ase.cell.lengths()[2]
-            slab_ase.cell[2] = [0, 0, L] #TO-THINK: break the symmetry?
-            slab_ase.wrap()
-            slab_ase.center()
-            slab_ase.pbc = [True, True, False]
-            slab_ase = sort(slab_ase, tags=slab_ase.positions[:, 2])
-            slab_ase = fix_layer(slab_ase, num_fix_layer, "bottom")
-            slab_ase_ls.append(slab_ase)
-            shift_ls.append(np.round(slab.shift, decimals=4))
-            order_ls.append(i)
-            unique_cluster = np.unique(detect_cluster(slab_ase)[1])
-            num_different_layers_ls.append(len(unique_cluster))
-            num_atom_ls.append(len(slab_ase))
-            composition_dict = dict(Counter(slab_ase.get_chemical_symbols()))
-            total_num_atoms = len(slab_ase)
-            composition_ls.append(
-                {
-                    key: float(np.round(values / total_num_atoms, decimals=4))
-                    for key, values in composition_dict.items()
-                }
-            )
+    slabgen = SlabGenerator(
+        initial_structure=bulk_struct, **slabgen_args
+    )  # bulk_pymatgen, miller_index, layer, vacuum_layer, center_slab, in_unit_planes,
+    slabs_symmetric = slabgen.get_slabs(symmetrize=symmetrize)
+    (
+        shift_ls,
+        order_ls,
+        slab_ase_ls,
+        num_different_layers_ls,
+        num_atom_ls,
+        composition_ls,
+    ) = ([], [], [], [], [], [])
+    for i, slab in enumerate(slabs_symmetric):
+        temp_path = Path("temp.cif")
+        CifWriter(slab).write_file(temp_path)
+        slab_ase = read(temp_path)
+        L = slab_ase.cell.lengths()[2]
+        slab_ase.cell[2] = [0, 0, L] #TO-THINK: break the symmetry?
+        slab_ase.wrap()
+        slab_ase.center()
+        slab_ase.pbc = [True, True, False]
+        slab_ase = sort(slab_ase, tags=slab_ase.positions[:, 2])
+        slab_ase = fix_layer(slab_ase, num_fix_layer, "bottom")
+        slab_ase_ls.append(slab_ase)
+        shift_ls.append(np.round(slab.shift, decimals=4))
+        order_ls.append(i)
+        unique_cluster = np.unique(detect_cluster(slab_ase)[1])
+        num_different_layers_ls.append(len(unique_cluster))
+        num_atom_ls.append(len(slab_ase))
+        composition_dict = dict(Counter(slab_ase.get_chemical_symbols()))
+        total_num_atoms = len(slab_ase)
+        composition_ls.append(
+            {
+                key: float(np.round(values / total_num_atoms, decimals=4))
+                for key, values in composition_dict.items()
+            }
+        )
+        if visualize:
+            plot_slab(slab_ase, f"order.{i}")
 
-
-        slabs_info_dict = {
-            "shift": shift_ls,
-            "order": order_ls,
-            "actual_layer": num_different_layers_ls,
-            "num_of_atoms": num_atom_ls,
-            "composition": composition_ls,
-            "ase_atoms": slab_ase_ls,
-        }
-        slabs_info_df = pd.DataFrame(slabs_info_dict).set_index(["shift", "order"])
-        
-        slab_info_df = slabs_info_df.loc[[(shift_id,order_id)]]
-        slab_layer_df_lst.append(slab_info_df)
-    slab_layer_df = pd.concat(slab_layer_df_lst)
+    slabs_info_dict = {
+        "shift": shift_ls,
+        "order": order_ls,
+        "actual_layer": num_different_layers_ls,
+        "num_of_atoms": num_atom_ls,
+        "composition": composition_ls,
+        "ase_atoms": slab_ase_ls,
+    }
+    slabs_info_df = pd.DataFrame(slabs_info_dict).set_index(["shift", "order"])
     if print_dataframe:
         pd.set_option("display.max_columns", None)
-        print(slab_layer_df[["actual_layer", "num_of_atoms", "composition"]])
-    if visualize:
-        for index, row in slab_layer_df.iterrows():
-            layer = row["actual_layer"]
-            plot_slab(row["ase_atoms"], f"layer.{layer}")
+        print(slabs_info_df[["actual_layer", "num_of_atoms", "composition"]])
     os.remove(temp_path)
     if save_to_db:
         formula = slab_ase.get_chemical_formula(empirical=True)
         miller_index = ''.join([str(i) for i in slabgen_args['miller_index']])
-        slab_db_name = '.'.join([formula,miller_index,'shift',str(shift_id),'id',str(order_id),'db'])
+        slab_db_name = '.'.join([formula,miller_index,'db'])
         slab_db_path = Path(slab_db_name)
         atoms_db = connect(slab_db_path)
-        for index, row in slab_layer_df.iterrows():
+        for i in range(len(slab_ase_ls)):
             atoms_db.write(
-                atoms=row["ase_atoms"],
-                actual_layer=row["actual_layer"],
+                atoms=slabs_info_dict["ase_atoms"][i],
+                shift=slabs_info_dict["shift"][i],
+                order=slabs_info_dict["order"][i],
+                actual_layer=slabs_info_dict["actual_layer"][i],
+                composition=str(slabs_info_dict["composition"][i]),
             )
 
     return {}
@@ -247,8 +237,8 @@ if __name__ == "__main__":
     import yaml
 
     with open(
-        "/jet/home/jpu/projects/projects/anodefree/asimtools_calc/gen_slab.yaml"
+        "/jet/home/jpu/projects/projects/asimtools/use_case/slab/sim_input_detect_facet.yaml"
     ) as stream:
         args = yaml.safe_load(stream)
     args = args["args"]
-    generate_slab(**args)
+    generate_sites(**args)
