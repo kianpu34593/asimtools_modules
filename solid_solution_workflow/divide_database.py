@@ -13,7 +13,7 @@ def divide_database(path_to_db,limit=999):
             atoms_lst.append(atoms_row.toatoms())
             key_value_pairs_lst.append(atoms_row.key_value_pairs)
             if len(atoms_lst)>=limit:
-                new_db_name='.'.join([db_name.split('.db')[0], f'{i}', '.db'])
+                new_db_name='.'.join([db_name.split('.db')[0], f'{i}', 'db'])
                 with connect(new_db_name) as my_new_db:
                     for atoms,key_value_pairs in zip(atoms_lst,key_value_pairs_lst):
                         my_new_db.write(atoms,**key_value_pairs)
