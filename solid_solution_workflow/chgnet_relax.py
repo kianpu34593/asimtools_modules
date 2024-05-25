@@ -7,7 +7,7 @@ from pymatgen.io.ase import AseAtomsAdaptor
 from chgnet.model import StructOptimizer
 from chgnet.model.model import CHGNet
 
-def chgnet_spe(
+def chgnet_relax(
                 image:Dict,
                 CHGNetRelaxerDict:Dict,
                 TM_lst:list,
@@ -15,15 +15,14 @@ def chgnet_spe(
                 ):
     AAA = AseAtomsAdaptor()
     chgnet = CHGNet.load()
-    #relaxer = StructOptimizer(**StructOptimizerDict)
+    relaxer = StructOptimizer(**StructOptimizerDict)
     atoms = get_atoms(**image)
 
-    #result = relaxer.relax(atoms=atoms, **CHGNetRelaxerDict)
-    #atoms = AAA.get_atoms(result['final_structure'])
-    #pot_e = atoms.get_potential_energy()
-    structure = AAA.get_structure(atoms)
-    prediction = chgnet.predict_structure(structure)
-    chgnet_magmoms = prediction['m'] #atoms.get_magnetic_moments()
+    result = relaxer.relax(atoms=atoms, **CHGNetRelaxerDict)
+    atoms = AAA.get_atoms(result['final_structure'])
+    pot_e = atoms.get_potential_energy()
+    chgnet_magmoms = atoms.get_magnetic_moments()
+    atoms.write("chgnet_relax.traj")
     unique_symbols = np.unique(atoms.get_chemical_symbols())
     non_TM_lst = [i for i in unique_symbols if i not in TM_lst]
     for TM in TM_lst:
