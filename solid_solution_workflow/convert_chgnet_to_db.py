@@ -31,7 +31,7 @@ def convert_chgnet_to_db(traj_dir_path,
             for atoms,subs_conc in atoms_lst:
                 my_db.write(atoms=atoms,subs_conc=subs_conc)
 
-    files_prediction_lst = glob(traj_dir_path+'/*/chgnet_prediction.traj')
+    files_prediction_lst = glob(traj_dir_path+'/*/image_output.traj')
     files_sort_read_save(files_prediction_lst,orig_element,subs_element)
     
     files_relax_lst = glob(traj_dir_path+'/*/chgnet_relax.traj')

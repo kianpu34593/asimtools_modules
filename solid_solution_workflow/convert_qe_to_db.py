@@ -14,7 +14,7 @@ def convert_qe_to_db(traj_dir_path,
         atoms_lst = []#[1 for _ in range(len(files_lst))]
         for i,fi in enumerate(files_lst_sorted):
             try:
-                atoms = read(fi)
+                atoms = read(fi,index='-1')
             except:
                 basename = os.path.basename(fi)
                 print("QE calculation erro: ", fi)
