@@ -29,9 +29,10 @@ def generate_slab(
     # api_key: str=None,
     slabgen_args: dict,  # { "miller_index", "min_slab_size", "min_vacuum_size", "center_slab", "in_unit_planes"}
     slab_layer_lst: list,
-    shift_id: int,
+    
     order_id: int,
     symmetrize: bool,
+    shift_id: int = None,
     num_fix_layer: int = 2,
     visualize: bool = True,
     print_dataframe: bool = True,
@@ -186,7 +187,7 @@ def generate_slab(
             CifWriter(slab).write_file(temp_path)
             slab_ase = read(temp_path)
             L = slab_ase.cell.lengths()[2]
-            slab_ase.cell[2] = [0, 0, L] #TO-THINK: break the symmetry?
+            slab_ase.cell[2] = [0, 0, L]  # TO-THINK: break the symmetry?
             slab_ase.wrap()
             slab_ase.center()
             slab_ase.pbc = [True, True, False]
@@ -207,7 +208,6 @@ def generate_slab(
                 }
             )
 
-
         slabs_info_dict = {
             "shift": shift_ls,
             "order": order_ls,
@@ -216,14 +216,20 @@ def generate_slab(
             "composition": composition_ls,
             "ase_atoms": slab_ase_ls,
         }
-        slabs_info_df = pd.DataFrame(slabs_info_dict).set_index(["shift", "order"])
-        
-        slab_info_df = slabs_info_df.loc[[(shift_id,order_id)]]
+        if shift_id is not None:
+            slabs_info_df = pd.DataFrame(slabs_info_dict).set_index(["shift", "order"])
+            slab_info_df = slabs_info_df.loc[[(shift_id, order_id)]]
+        elif shift_id is None:
+            slabs_info_df = pd.DataFrame(slabs_info_dict).set_index(["order"])
+            slab_info_df = slabs_info_df.loc[[order_id]]
         slab_layer_df_lst.append(slab_info_df)
     slab_layer_df = pd.concat(slab_layer_df_lst)
+    shift_id_lst = np.unique(slab_layer_df['shift'].to_numpy())
+    if len(shift_id_lst) > 1:
+        raise RuntimeError(f"Multiple shifts among generated slabs. Shift list: {shift_id_lst}")
     if print_dataframe:
         pd.set_option("display.max_columns", None)
-        print(slab_layer_df[["actual_layer", "num_of_atoms", "composition"]])
+        print(slab_layer_df[["actual_layer", "num_of_atoms", "composition", "shift"]])
     if visualize:
         for index, row in slab_layer_df.iterrows():
             layer = row["actual_layer"]
@@ -231,8 +237,10 @@ def generate_slab(
     os.remove(temp_path)
     if save_to_db:
         formula = slab_ase.get_chemical_formula(empirical=True)
-        miller_index = ''.join([str(i) for i in slabgen_args['miller_index']])
-        slab_db_name = '.'.join([formula,miller_index,'shift',str(shift_id),'id',str(order_id),'db'])
+        miller_index = "".join([str(i) for i in slabgen_args["miller_index"]])
+        slab_db_name = ".".join(
+            [formula, miller_index, "shift", str(shift_id), "id", str(order_id), "db"]
+        )
         slab_db_path = Path(slab_db_name)
         atoms_db = connect(slab_db_path)
         for index, row in slab_layer_df.iterrows():
@@ -242,6 +250,7 @@ def generate_slab(
             )
 
     return {}
+
 
 if __name__ == "__main__":
     import yaml

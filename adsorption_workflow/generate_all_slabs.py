@@ -180,7 +180,7 @@ def generate_all_slabs(
         CifWriter(slab).write_file(temp_path)
         slab_ase = read(temp_path)
         L = slab_ase.cell.lengths()[2]
-        slab_ase.cell[2] = [0, 0, L] #TO-THINK: break the symmetry?
+        slab_ase.cell[2] = [0, 0, L]  # TO-THINK: break the symmetry?
         slab_ase.wrap()
         slab_ase.center()
         slab_ase.pbc = [True, True, False]
@@ -218,8 +218,8 @@ def generate_all_slabs(
     os.remove(temp_path)
     if save_to_db:
         formula = slab_ase.get_chemical_formula(empirical=True)
-        miller_index = ''.join([str(i) for i in slabgen_args['miller_index']])
-        slab_db_name = '.'.join([formula,miller_index,'db'])
+        miller_index = "".join([str(i) for i in slabgen_args["miller_index"]])
+        slab_db_name = ".".join([formula, miller_index, "db"])
         slab_db_path = Path(slab_db_name)
         atoms_db = connect(slab_db_path)
         for i in range(len(slab_ase_ls)):
@@ -232,6 +232,7 @@ def generate_all_slabs(
             )
 
     return {}
+
 
 if __name__ == "__main__":
     import yaml
