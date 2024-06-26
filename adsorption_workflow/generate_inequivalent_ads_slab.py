@@ -24,7 +24,7 @@ import time
 import os
 import re
 
-import concurrent.futures
+
 
 def generate_inequivalent_ads_slab(
     slab_atoms_image, adsorbate, ads_slab_image, fixed_line=False
@@ -51,7 +51,7 @@ def generate_inequivalent_ads_slab(
         transformed_mat = np.array([x_norm_vec,y_norm_vec]).T
         return transformed_mat
 
-    def prepare_atoms_prototype(supercell_size, cell_xy, offset_xy_transformed_frac):
+    def prepare_atoms_prototype(supercell_size, cell_xy, slab_atoms, offset_xy_transformed_frac):
         atoms_prototype = (Atoms("Li", [(0, 0, 1.23 / 2)], cell=[4.33, 4.33, 1.23], pbc=[1, 1, 0]) * supercell_size)
         atoms_prototype_cell = np.array(atoms_prototype.cell)
         atoms_prototype_frac_coord = atoms_prototype.get_scaled_positions()[:, :-1]
@@ -64,7 +64,7 @@ def generate_inequivalent_ads_slab(
         atoms_prototype.set_positions(all_ads_cart_coord)
         return atoms_prototype
 
-    def save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, degeneracy, db_path):
+    def save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, db_path):
         with connect(db_path) as ads_db:
             for atoms in ads_slab_lst:
                 ads_db.write(
@@ -74,7 +74,7 @@ def generate_inequivalent_ads_slab(
                     num_adsorbate=int(num_adsorbate),
                     ads_site="inequivalent",
                     size=".".join([str(i) for i in supercell_size]),
-                    degeneracy=int(degeneracy)
+                    #degeneracy=int(degeneracy)
                 )
 
     offset_xy = get_ads_xy_positions(ads_slab_image)["positions"]
@@ -83,7 +83,7 @@ def generate_inequivalent_ads_slab(
 
     num_sites = int(np.prod(supercell_size))
 
-    indices = np.arange(0,num_sites)
+    # indices = np.arange(0,num_sites)
 
     cell_xy = slab_atoms.cell[:2,:2]
 
@@ -94,27 +94,27 @@ def generate_inequivalent_ads_slab(
     
     offset_xy_transformed_frac=offset_xy_transformed/slab_atoms.cell.cellpar()[:2]
 
-    atoms_prototype = prepare_atoms_prototype(supercell_size, cell_xy, offset_xy_transformed_frac)
+    atoms_prototype = prepare_atoms_prototype(supercell_size, cell_xy, slab_atoms, offset_xy_transformed_frac)
 
     for num_adsorbate in tqdm(range(1, num_sites)):
         adsorbate_ratio = np.round(num_adsorbate / num_sites, decimals=4)
         
-        # ads_slab_lst = [0 for _ in range(999)]
-        idx = 0
+        # # ads_slab_lst = [0 for _ in range(999)]
+        # idx = 0
         total_combination = comb(num_sites, num_adsorbate)
-        all_atoms_lst = [atoms_prototype.copy() for _ in range(total_combination)]
-        print(
-            "Total combination: ",
-            total_combination,
-            f". With num_ads/num_sites: {num_adsorbate}/{num_sites}.",
-        )
-        ads_slab_db_bank_ratio_path = f"ads.{adsorbate}.conc.{adsorbate_ratio}"
-        os.makedirs(ads_slab_db_bank_ratio_path) 
-        for i,combinations in enumerate(itertools.combinations(range(num_sites), num_adsorbate)):
-            temp_atoms = all_atoms_lst[i]
-            filtered_indices = indices[~np.isin(range(0,num_sites), list(combinations))]
-            temp_atoms.symbols[filtered_indices] = 'H'
-            # all_atoms_lst[i]=temp_atoms
+        # all_atoms_lst = [atoms_prototype.copy() for _ in range(total_combination)]
+        # print(
+        #     "Total combination: ",
+        #     total_combination,
+        #     f". With num_ads/num_sites: {num_adsorbate}/{num_sites}.",
+        # )
+        # ads_slab_db_bank_ratio_path = f"ads.{adsorbate}.conc.{adsorbate_ratio}"
+        # os.makedirs(ads_slab_db_bank_ratio_path) 
+        # for i,combinations in enumerate(itertools.combinations(range(num_sites), num_adsorbate)):
+        #     temp_atoms = all_atoms_lst[i]
+        #     filtered_indices = indices[~np.isin(range(0,num_sites), list(combinations))]
+        #     temp_atoms.symbols[filtered_indices] = 'H'
+        #     # all_atoms_lst[i]=temp_atoms
 
         base_struc = AseAtomsAdaptor.get_structure(atoms_prototype)
 
@@ -123,58 +123,39 @@ def generate_inequivalent_ads_slab(
             [adsorbate, str(adsorbate_ratio), 'H', str(1-adsorbate_ratio)]
         )
 
-        # Record the start time
-        start_time = time.time()
-
         enumlib_trans = EnumerateStructureTransformation(min_cell_size=1, max_cell_size=1)
         ss = enumlib_trans.apply_transformation(
             enum_struc, return_ranked_list=total_combination
         )
         ss_atoms_lst = [AseAtomsAdaptor.get_atoms(d["structure"]) for d in ss]
-        # Record the end time
-        end_time = time.time()
 
-        # Calculate the elapsed time
-        elapsed_time = end_time - start_time
 
-        print("enumerate execution time:", elapsed_time, "seconds")
-
-        comp = SymmetryEquivalenceCheck(to_primitive=True)
+        # comp = SymmetryEquivalenceCheck(to_primitive=True)
 
         
-        inequivalent_lst = [0 for _ in range(len(ss_atoms_lst))]
-        total_degeneracy = 0
+        # inequivalent_lst = [0 for _ in range(len(ss_atoms_lst))]
+        # total_degeneracy = 0
 
-        # Record the start time
-        start_time = time.time()
-
-        for i,enumlib_atoms in tqdm(enumerate(ss_atoms_lst),total=len(ss_atoms_lst)):
-            enumlib_atoms.wrap()
-            results_lst = []
-            for atoms in all_atoms_lst:
-                results_lst.append(comp.compare(atoms, enumlib_atoms))
-            #degeneracy = sum(comp.compare(atoms, enumlib_atoms) for atoms in all_atoms_lst)
-            degeneracy = sum(results_lst)
+        # for i,enumlib_atoms in tqdm(enumerate(ss_atoms_lst),total=len(ss_atoms_lst)):
+        #     enumlib_atoms.wrap()
+        #     results_lst = []
+        #     for atoms in all_atoms_lst:
+        #         results_lst.append(comp.compare(atoms, enumlib_atoms))
+        #     #degeneracy = sum(comp.compare(atoms, enumlib_atoms) for atoms in all_atoms_lst)
+        #     degeneracy = sum(results_lst)
    
-            total_degeneracy += degeneracy
-            inequivalent_lst[i]=(enumlib_atoms, degeneracy)
-            indices_to_delete = np.where(results_lst)[0]
-            for index in sorted(indices_to_delete, reverse=True):
-                del all_atoms_lst[index]
-        print("Total degeneracy: ", total_degeneracy)
+        #     total_degeneracy += degeneracy
+        #     inequivalent_lst[i]=(enumlib_atoms, degeneracy)
+        #     indices_to_delete = np.where(results_lst)[0]
+        #     for index in sorted(indices_to_delete, reverse=True):
+        #         del all_atoms_lst[index]
+        # print("Total degeneracy: ", total_degeneracy)
 
-        # Record the end time
-        end_time = time.time()
-
-        # Calculate the elapsed time
-        elapsed_time = end_time - start_time
-
-        print("degeneracy execution time:", elapsed_time, "seconds")
         ads_slab_lst = []
 
         # Record the start time
         start_time = time.time()
-        for enumlib_atoms,degeneracy in inequivalent_lst:
+        for enumlib_atoms in ss_atoms_lst:
             ads_cart_coord_lst = enumlib_atoms.get_positions()[np.array(enumlib_atoms.get_chemical_symbols()) == adsorbate,:2].tolist()
             ads_slab_atoms = slab_atoms.copy()
             for ads_cart_coord in ads_cart_coord_lst:
@@ -198,27 +179,9 @@ def generate_inequivalent_ads_slab(
                 ads_slab_atoms.set_constraint([fix_line] + fix_atoms)
             ads_slab_atoms.wrap()
             ads_slab_lst.append(ads_slab_atoms)
-            if len(ads_slab_lst) > 100:
-                ads_slab_db_path = f"{ads_slab_db_bank_ratio_path}/{idx}.db"
-                save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, degeneracy, ads_slab_db_path)
-                ads_slab_lst = []
-                idx += 1
-
-        if len(ads_slab_lst) != 0:
-            ads_slab_db_path = f"{ads_slab_db_bank_ratio_path}/{idx}.db"
-            save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, degeneracy, ads_slab_db_path)
-        else:
-            idx -= 1
-
-        # Record the end time
-        end_time = time.time()
-
-        # Calculate the elapsed time
-        elapsed_time = end_time - start_time
-
-        print("ads_slab_generation execution time:", elapsed_time, "seconds")
-
-        print("No. of db saved: ", idx + 1)
+    
+        ads_slab_db_path = f"enumlib.inequivalent.db"
+        save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, ads_slab_db_path)
 
     return {}
 
