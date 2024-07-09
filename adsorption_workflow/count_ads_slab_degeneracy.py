@@ -10,18 +10,18 @@ from math import comb
 from ase.db import connect
 from ase.constraints import FixedLine
 
-from autocat.adsorption import place_adsorbate
-
 from asimtools.utils import get_atoms,get_images
 
 from tqdm import tqdm
 
 import time
 
+from glob import glob 
+
 import os
 import re
 
-def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx):
+def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx = None,image = None,image_traj_path=None,update_db = False):
     def get_ads_xy_positions(
         ads_slab_image=None,  
     ):
@@ -62,10 +62,19 @@ def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx
                 id = idx+1,
                 degeneracy=int(degeneracy)
             )
-
+    if idx is None and image is not None:
+        current_path = os.getcwd()
+        idx = int(current_path.split('/')[-1].split('__')[1])
+        #idx = int(image['image_file'].split('/')[-1].split('_')[0])
 
     with connect(enumlib_ads_slab_db_path) as ads_slab_db:
         ads_slab_row = ads_slab_db.get(id=idx+1)
+    try:
+        ads_slab_row.energy
+        atoms_traj_path = glob(os.path.join(os.path.dirname(image_traj_path),f'{idx+1}_atom_relax.traj'))[0]
+        ads_slab_atoms = read(atoms_traj_path,index=0)
+    except:
+        ads_slab_atoms = ads_slab_row.toatoms()
 
     num_adsorbate = ads_slab_row.num_adsorbate
     adsorbate = ads_slab_row.adsorbate
@@ -73,21 +82,20 @@ def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx
     num_sites = int(np.prod(supercell_size))
     indices = np.arange(0,num_sites)
 
-    adsorbate_pos = ads_slab_row.toatoms().get_positions()[-num_adsorbate:,:]
-    cell_xyz = np.array(ads_slab_row.toatoms().cell)
+    adsorbate_pos = ads_slab_atoms.get_positions()[-num_adsorbate:,:]
+    cell_xyz = np.array(ads_slab_atoms.cell)
     cell_xyz[:, 2] = [0, 0, 1.23]
     adsorbate_pos[:,2] = 1.23 / 2
 
     offset_xy = get_ads_xy_positions(single_ads_slab_image)["positions"]
     cell_xy = cell_xyz[:2,:2]
-    cell_alpha_beta = ads_slab_row.toatoms().cell.cellpar()[:2]
+    cell_alpha_beta = ads_slab_atoms.cell.cellpar()[:2]
     transformation_mat = basis_transformation(cell_xy)
     transformation_mat_inv = np.linalg.inv(transformation_mat)
     offset_xy_transformed = np.dot(transformation_mat_inv,offset_xy)
     offset_xy_transformed_frac=offset_xy_transformed/cell_alpha_beta
 
     atoms_prototype = prepare_atoms_prototype(supercell_size, cell_xy, cell_alpha_beta, offset_xy_transformed_frac)
-
 
     # # adsorbate_2dmodel = Atoms(f'{adsorbate}{num_adsorbate}', positions=adsorbate_pos)
     # # adsorbate_2dmodel.set_cell(cell_xyz,scale_atoms = False)
@@ -103,8 +111,8 @@ def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx
     idx_to_keep_lst = []
     for i in range(adsorbate_pos.shape[0]):
         diff = np.abs(atoms_prototype.get_positions() - adsorbate_pos[i,:])
-        idx = np.where((diff < 1e-5).all(axis=1))[0][0].tolist()
-        idx_to_keep_lst.append(idx)
+        idx_temp = np.where((diff < 1e-3).all(axis=1))[0][0].tolist()
+        idx_to_keep_lst.append(idx_temp)
     adsorbate_2dmodel = atoms_prototype.copy()
     filtered_indices = [i for i in indices if i not in idx_to_keep_lst]
     adsorbate_2dmodel.symbols[filtered_indices] = 'H'
@@ -120,12 +128,16 @@ def count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx
     
     comp = SymmetryEquivalenceCheck(to_primitive=True)
     degeneracy = sum(comp.compare(atoms, adsorbate_2dmodel) for atoms in all_atoms_lst)
-    update_database(enumlib_ads_slab_db_path, idx, degeneracy)
-    return {}
+    #print(degeneracy)
+    #update_database(enumlib_ads_slab_db_path, idx, degeneracy)
+    return {"degeneracy":degeneracy}
 
 if __name__ == "__main__": 
-    enumlib_ads_slab_db_path = "/jet/home/jpu/projects/projects/asimtools/asimtools_module/adsorption_workflow/enumlib.inequivalent.db"
-    idx = 0
-    single_ads_slab_image = {"image_file":"/jet/home/jpu/projects/projects/anodefree/asimtools_calc/production/Cu_mp-30/111_ads_chained_workflow/step-1/Cu.111.id.0.ads.Li.all_sites.db"} 
-    count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx)
+    enumlib_ads_slab_db_path = "/scratch/venkvis_root/venkvis/kianpu/projects/anodefree/production_enumlib/Cu_mp-30/100_ads_chained_workflow/step-4/enumlib.inequivalent.db"
+    idx_lst = [8, 6, 3, 11, 17, 7, 2, 9, 10, 13, 14, 16, 1, 15]
+    single_ads_slab_image = {"image_file":"/scratch/venkvis_root/venkvis/kianpu/projects/anodefree/production_enumlib/Cu_mp-30/100_ads_chained_workflow/step-1/Cu.100.id.0.ads.Li.all_sites.db"} 
 
+    image_traj_path = "/scratch/venkvis_root/venkvis/kianpu/projects/anodefree/production_enumlib/Cu_mp-30/100_ads_chained_workflow/step-5/*/"
+    for idx in idx_lst:
+        count_ads_slab_degeneracy(single_ads_slab_image,enumlib_ads_slab_db_path,idx = idx,image = None,image_traj_path=image_traj_path,update_db=True)
+    #[8, 6, 3, 11, 17, 7, 2, 9, 10, 13, 14, 16, 1, 15]

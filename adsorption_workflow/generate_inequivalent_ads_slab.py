@@ -180,17 +180,17 @@ def generate_inequivalent_ads_slab(
             ads_slab_atoms.wrap()
             ads_slab_lst.append(ads_slab_atoms)
     
-        ads_slab_db_path = f"enumlib.inequivalent.db"
+        ads_slab_db_path = "enumlib.inequivalent.db"
         save_to_database(ads_slab_lst, adsorbate, adsorbate_ratio, num_adsorbate, supercell_size, ads_slab_db_path)
 
     return {}
 
 if __name__ == "__main__":
-    slab_atoms_image={"image_file":"/jet/home/jpu/projects/projects/anodefree/asimtools_calc/production/Cu_mp-30/111_ads_chained_workflow/step-1/Cu.111.id.0.all_sites.db",
+    slab_atoms_image={"image_file":"/scratch/venkvis_root/venkvis/kianpu/projects/anodefree/production_enumlib/Cu_mp-30/100_ads_chained_workflow/step-1/Cu.100.id.0.all_sites.db",
                         "index": 0,
                         "repeat": [4,4,1],
     }
     adsorbate = 'Li'
-    ads_slab_image = {"image_file":"/jet/home/jpu/projects/projects/anodefree/asimtools_calc/production/Cu_mp-30/111_ads_chained_workflow/step-1/Cu.111.id.0.ads.Li.all_sites.db"} 
+    ads_slab_image = {"image_file":"/scratch/venkvis_root/venkvis/kianpu/projects/anodefree/production_enumlib/Cu_mp-30/100_ads_chained_workflow/step-1/Cu.100.id.0.ads.Li.all_sites.db"} 
 
     generate_inequivalent_ads_slab(slab_atoms_image,adsorbate,ads_slab_image)
